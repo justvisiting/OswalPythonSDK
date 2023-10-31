@@ -8,8 +8,6 @@ import socket
 import re, uuid
 import hashlib
 import platform
-import wmi
-import geocoder
 
 import websocket
 # import requests
@@ -168,23 +166,30 @@ def GetPublicIPAddress():
 
 # System Info
 
-c = wmi.WMI()   
-objsystem = c.Win32_ComputerSystem()[0]
 system = platform.uname()
 
+"""
+HEADER_SOURCE_ID    = "Desktop"
+	HEADER_OSNAME       = "Darwin"
+	HEADER_OSVERSION    = "1.1"
+	HEADER_DEVICE_MODEL = "yoga"
+
+	HEADER_MANUFACTURER = "dell"
+	HEADER_PRODUCT_NAME = "MyMobile"
+	HEADER_PRODUCT_VER  = "1.0.1"
+	HEADER_APP_ID       = "1"
+"""
 def GetOsName():
-    try:        
-        osname = system.system
-        return osname
+    try:
+        return "Darwin"
     except Exception as e:
         print(e)
         WriteIntoLog("FAILED", "MOFSLOPENAPI.py", ("GetOsName" + str(e)))
         # return "Win32NT"
 
 def GetOsVersion():
-    try:        
-        osversion = system.version
-        return osversion
+    try:
+        return "1.1"
     except Exception as e:
         print(e)
         WriteIntoLog("FAILED", "MOFSLOPENAPI.py", ("GetOsVersion" + str(e)))
@@ -201,8 +206,7 @@ def GetInstalledAppid():
 
 def GetDeviceModel():
     try:   
-        devicemodel = objsystem.Model     
-        return devicemodel
+        return "yoga"
     except Exception as e:
         print(e)
         WriteIntoLog("FAILED", "MOFSLOPENAPI.py", ("GetDeviceModel" + str(e)))
@@ -210,7 +214,7 @@ def GetDeviceModel():
 
 def GetManufacturer():
     try:   
-        manufacturer = objsystem.Manufacturer
+        manufacturer = "Dell"
         return manufacturer
     except Exception as e:
         print(e)
@@ -236,9 +240,8 @@ def GetProductVersion():
         # return "1"
 
 def GetLatitudeLongitude():
-    try:   
-        ipaddress = geocoder.ip('me')
-        lst_latlng = ipaddress.latlng
+    try:
+        lst_latlng = [18.5196, 73.8554]
         # print(var[0],var[1] )
         return lst_latlng
     except Exception as e:
@@ -610,14 +613,24 @@ class MOFSLOPENAPI(object):
 
         return l_verifyotpResponse
 
-    # login function with username and password
     def login(self, f_clientID, f_password, f_twoFA, f_totp = None ,f_vendorinfo = None):
+        if f_password == "":
+            WriteIntoLog("FAILED", "MOFSLOPENAPI.py", "Password is empty")
+
+        f_strallcombine = f_password + self.m_strApikey
+        h = hashlib.sha256(f_strallcombine.encode("utf-8"))
+        checksum = h.hexdigest()
+        return MOFSLOPENAPI.loginV2(self, f_clientID, checksum, f_twoFA, f_totp, f_vendorinfo)
+
+    # logout API
+    # login function with username and password
+    def loginV2(self, f_clientID, checksum, f_twoFA, f_totp = None ,f_vendorinfo = None):
 
         l_loginResponse = {}
 
         try:
-            if f_clientID == "" or f_password == "":
-                WriteIntoLog("FAILED", "MOFSLOPENAPI.py", "login_Client_id or Password is empty")
+            if f_clientID == "" :
+                WriteIntoLog("FAILED", "MOFSLOPENAPI.py", "login_Client_id is empty")
 
             else:
                 WriteIntoLog("SUCCESS", "MOFSLOPENAPI.py", "Initilize login request send")
@@ -625,9 +638,6 @@ class MOFSLOPENAPI(object):
             self.m_vendorinfo = f_vendorinfo
             self.m_clientcode = f_clientID
 
-            f_strallcombine = f_password + self.m_strApikey 
-            h = hashlib.sha256(f_strallcombine.encode("utf-8"))
-            checksum = h.hexdigest()
             # print(checksum, type(checksum))
             l_PostData = {
                 "userid": f_clientID,
@@ -2275,6 +2285,7 @@ class MOFSLOPENAPI(object):
         # # TradeStatusResponse = j_TradeStatusResponse.content.decode('utf-8')
         # # if 
         # TradeStatusResponse = json.loads(j_TradeStatusResponse)
+        WriteIntoLog_TradeStatus('message on socket', message)
         self._TradeStatus_on_message(self.ws2,"TradeStatus",j_TradeStatusResponse)
 
     def __TradeStatus_on_error(self, ws2, error):
@@ -2307,12 +2318,14 @@ class MOFSLOPENAPI(object):
 
 
     def _TradeStatus_on_open(self, ws2):
+        print('TradeStatus_on_open')
         pass
 
     def _TradeStatus_on_message(self, ws2, message_type, message):
-        pass
+        print('TradeStatus_on_message', message_type, message)
 
     def _TradeStatus_on_error(self, ws2):
+        print('_TradeStatus_on_error')
         pass
 
     def _TradeStatus_on_close(self, ws2, message_type, message):
