@@ -1,3 +1,5 @@
+import logging
+
 import requests
 from requests import get
 import json
@@ -338,6 +340,7 @@ class MOFSLOPENAPI(object):
         # self.l_scrip_code = []
         # self.l_exchange_index = []
         self.Websocket_version = self.Websocket_version
+        self.Websocket2Message_callback = None
 
         WriteIntoLog("SUCCESS", "MOFSLOPENAPI.py", "Initilize Constructor Done")
 
@@ -2105,7 +2108,8 @@ class MOFSLOPENAPI(object):
 
         j_data = json.dumps(l_data)
         self.ws2.send(j_data)
-        WriteIntoLog_TradeStatus("SUCCESS", "MOFSLOPENAPI.py", "OrderUnsubscribe Packet Sent")
+        logging.warning("OrderSubscribe Packet Sent")
+        WriteIntoLog_TradeStatus("SUCCESS", "MOFSLOPENAPI.py", "OrderSubscribe Packet Sent")
         # print(j_data)
 
     def OrderUnsubscribe(self):
@@ -2176,6 +2180,9 @@ class MOFSLOPENAPI(object):
         
         self.ws2.run_forever()
 
+
+    def RegisterForWebScoket2Message(self, callback):
+        self.Websocket2Message_callback = callback
 
     def Broadcast_connect(self):
         t1 = Thread(target=self.Websocket1_connect)        
@@ -2261,7 +2268,7 @@ class MOFSLOPENAPI(object):
 
         
 
-    def __TradeStatus_on_open(self, ws2):
+    def __TradeStatus_on_open(self, ws2=None):
         
         WriteIntoLog_TradeStatus("SUCCESS", "MOFSLOPENAPI.py", "TradeStatus Connection Opened")
         self._TradeStatus_on_open(ws2)
@@ -2279,16 +2286,17 @@ class MOFSLOPENAPI(object):
         #     background_task.cancelled = False 
         
 
-    def __TradeStatus_on_message(self, ws2, message):
+    def __TradeStatus_on_message(self, message):
         j_TradeStatusResponse = message
         # print(type(j_TradeStatusResponse))
         # # TradeStatusResponse = j_TradeStatusResponse.content.decode('utf-8')
         # # if 
         # TradeStatusResponse = json.loads(j_TradeStatusResponse)
-        WriteIntoLog_TradeStatus('message on socket', message)
-        self._TradeStatus_on_message(self.ws2,"TradeStatus",j_TradeStatusResponse)
+        WriteIntoLog_TradeStatus("SUCCESS", "MOFSLOPENAPI.py", f'message on socket {message}')
+        logging.warning(f"{datetime.now()}, TradeStatus on message, {message}")
+        #self._TradeStatus_on_message(self.ws2,"TradeStatus",j_TradeStatusResponse)
 
-    def __TradeStatus_on_error(self, ws2, error):
+    def __TradeStatus_on_error(self, error):
         print(error) 
         # self._TradeStatus_on_error(ws2, error)
                     
@@ -2296,12 +2304,12 @@ class MOFSLOPENAPI(object):
             self.TradeStatus_connect()
                        
 
-    def __TradeStatus_on_close(self, ws2, close_status_code, close_msg):
+    def __TradeStatus_on_close(self, close_status_code, close_msg):
         
         WriteIntoLog_TradeStatus("SUCCESS", "MOFSLOPENAPI.py", "TradeStatus Connection Closed")
         self.TradeStatusHeartbeat_flag = False
         
-        self._TradeStatus_on_close(ws2, close_status_code, close_msg)
+        #self._TradeStatus_on_close(ws2, close_status_code, close_msg)
 
 
     def _Broadcast_on_open(self, ws1):
@@ -2323,6 +2331,8 @@ class MOFSLOPENAPI(object):
 
     def _TradeStatus_on_message(self, ws2, message_type, message):
         print('TradeStatus_on_message', message_type, message)
+        if self.Websocket2Message_callback is not None:
+            self.Websocket2Message_callback(message)
 
     def _TradeStatus_on_error(self, ws2):
         print('_TradeStatus_on_error')
